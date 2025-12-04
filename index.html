@@ -9,17 +9,23 @@
   <!-- FullCalendar CSS -->
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
   
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- Google API Client Library -->
   <script src="https://apis.google.com/js/api.js"></script>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>Personnel Planning Calendar</h1>
-      
-      <div id="status" class="status" style="display: none;"></div>
-      
-      <div class="controls">
+      <div class="header-wrapper">
+        <div class="header-top">
+          <h1>Personnel Planning Calendar</h1>
+          <div class="logo-placeholder">
+            <img src="Trailtech_AT_Monogram_Tagline.png" alt="Company Logo" class="logo">
+          </div>
+        </div>
+        
+        <div class="controls">
         <div class="control-group">
           <button id="signInBtn" class="btn btn-primary" style="display: none;">Sign in with Google</button>
           <button id="signOutBtn" class="btn btn-secondary" style="display: none;">Sign out</button>
@@ -40,21 +46,104 @@
         </div>
         
         <div class="control-group">
-          <label for="viewType">View</label>
-          <select id="viewType">
-            <option value="dayGridMonth">Month</option>
-            <option value="timeGridWeek">Week</option>
-            <option value="listYear">Year</option>
-          </select>
+          <button id="overviewToggleBtn" class="btn btn-secondary">Overview</button>
         </div>
         
         <div class="control-group">
           <button id="refreshBtn" class="btn">Refresh</button>
         </div>
+        
+        <div class="control-group">
+          <button id="managePeopleBtn" class="btn btn-secondary">Manage People</button>
+        </div>
+        
+        <div class="control-group">
+          <button id="manageProjectsBtn" class="btn btn-secondary">Manage Projects</button>
+        </div>
+        </div>
       </div>
+      
+      <div id="personnelLegend" class="personnel-legend"></div>
+      
+      <div id="status" class="status" style="display: none;"></div>
     </div>
     
     <div id="calendar"></div>
+    <div id="compactYearView" style="display: none;"></div>
+  </div>
+  
+  <!-- Modal for creating events -->
+  <div id="eventModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <span class="modal-close">&times;</span>
+      <h2>Create New Assignment</h2>
+      <div class="modal-form">
+        <div class="form-group">
+          <label for="eventPerson">Person:</label>
+          <select id="eventPerson" class="form-control">
+            <option value="">Select a person...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="eventProject">Project:</label>
+          <select id="eventProject" class="form-control">
+            <option value="">Select a project...</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button id="eventCreateBtn" class="btn btn-primary">Create</button>
+          <button id="eventCancelBtn" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal for managing people -->
+  <div id="peopleModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <span class="modal-close" data-modal="peopleModal">&times;</span>
+      <h2>Manage People</h2>
+      <div class="modal-form">
+        <div class="form-group">
+          <label for="newPersonName">Add New Person:</label>
+          <input type="text" id="newPersonName" class="form-control" placeholder="Enter person name">
+        </div>
+        <div class="form-group">
+          <label for="newPersonColor">Color:</label>
+          <input type="color" id="newPersonColor" class="form-control" value="#4285f4">
+        </div>
+        <button id="addPersonBtn" class="btn btn-primary">Add Person</button>
+        <div class="form-group">
+          <label>Current People:</label>
+          <div id="peopleList" class="item-list"></div>
+        </div>
+        <div class="form-actions">
+          <button id="peopleCloseBtn" class="btn btn-secondary">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal for managing projects -->
+  <div id="projectsModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <span class="modal-close" data-modal="projectsModal">&times;</span>
+      <h2>Manage Projects</h2>
+      <div class="modal-form">
+        <div class="form-group">
+          <label for="newProjectName">Project Name:</label>
+          <input type="text" id="newProjectName" class="form-control" placeholder="Enter project name">
+        </div>
+        <button id="addProjectBtn" class="btn btn-primary">Add Project</button>
+        <div class="form-group" style="margin-top: 20px;">
+          <label>Current Projects:</label>
+          <div id="projectsList" class="item-list"></div>
+        </div>
+        <div class="form-actions">
+          <button id="projectsCloseBtn" class="btn btn-secondary">Close</button>
+        </div>
+      </div>
+    </div>
   </div>
   
   <!-- Configuration -->

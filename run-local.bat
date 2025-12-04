@@ -12,7 +12,9 @@ REM Check if Python is available
 python --version >nul 2>&1
 if %errorlevel% == 0 (
     echo Using Python HTTP server...
-    start http://localhost:8000
+    echo Starting server on http://localhost:8000
+    echo Opening browser in 2 seconds...
+    start "" cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:8000"
     python -m http.server 8000
 ) else (
     echo Python not found. Checking for Node.js...
@@ -24,8 +26,10 @@ if %errorlevel% == 0 (
         if %errorlevel% neq 0 (
             npm install -g http-server
         )
-        start http://localhost:8000
-        http-server -p 8000 -o
+        echo Starting server on http://localhost:8000
+        echo Opening browser in 2 seconds...
+        start "" cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:8000"
+        http-server -p 8000
     ) else (
         echo ERROR: Neither Python nor Node.js found!
         echo Please install Python 3 or Node.js to run the local server.

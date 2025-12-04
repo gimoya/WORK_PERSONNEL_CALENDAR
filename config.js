@@ -4,27 +4,27 @@ const CONFIG = {
   // Get this from Google Calendar settings > Integrate calendar > Calendar ID
   calendarId: 'c_8a82d2d6d54ec545f6019870cde156c3b4f0b338d760091f88c329358e0de867@group.calendar.google.com',
   
-  // List of people (5-10 persons)
+  // List of people with colors
   people: [
-    'Cody',
-    'Kay',
-    'Rene',
-    'Gary',
-    'Dimitri',
-    'Alec',
-    'Allen',
-    'Paul S',
-    'Paul V',
-    'Viktor'
+    { name: 'Cody', color: '#4285f4' },
+    { name: 'Kay', color: '#ea4335' },
+    { name: 'Rene', color: '#fbbc04' },
+    { name: 'Gary', color: '#34a853' },
+    { name: 'Dimitri', color: '#9c27b0' },
+    { name: 'Alec', color: '#ff9800' },
+    { name: 'Allen', color: '#00bcd4' },
+    { name: 'Paul S', color: '#795548' },
+    { name: 'Paul V', color: '#607d8b' },
+    { name: 'Viktor', color: '#e91e63' }
     // Add more people as needed
   ],
   
-  // List of projects with colors
+  // List of projects
   projects: [
-    { name: 'Rossau II', color: '#4285f4' },
-    { name: 'Klaus Äule', color: '#ea4335' },
-    { name: 'Alberschwende', color: '#fbbc04' },
-    { name: '...', color: '#34a853' }
+    'Rossau II',
+    'Klaus Äule',
+    'Alberschwende',
+    '...'
     // Add more projects as needed
   ],
   
