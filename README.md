@@ -5,11 +5,14 @@ A drag-and-drop web application for visual personnel allocation planning using G
 ## Features
 
 - **Visual Overview**: Month, week, and year views of personnel allocations
+- **Table-Based Overview**: Comprehensive table view with project/role/person columns and sticky headers
+- **Role-Based Assignments**: Assign specific roles (Project-Manager, Foreman, Shaper, Operator-Shaper) to personnel
 - **Drag & Drop**: Easily move assignments by dragging events
-- **Create Assignments**: Click empty slots to create new person-project assignments
+- **Create Assignments**: Click empty slots to create new person-project-role assignments
 - **Filtering**: Filter by person or project
 - **Color Coding**: Projects are color-coded for easy visual identification
 - **Secure Authentication**: Uses OAuth 2.0 with Google Workspace accounts
+- **Today Navigation**: Quick scroll to today's date in the overview
 
 ## Prerequisites
 
@@ -66,23 +69,31 @@ A drag-and-drop web application for visual personnel allocation planning using G
 1. Open `config.js`
 2. Update `calendarId` with your calendar ID from Step 1
 3. Update `oauthClientId` with your OAuth Client ID from Step 3
-4. Update `people` array with your team member names
-5. Update `projects` array with your projects and colors:
+4. Update `people` array with your team member names and colors
+5. Update `projects` array with your project names
+6. Update `roles` array with your role definitions:
 
 ```javascript
 const CONFIG = {
   calendarId: 'your-calendar-id@group.calendar.google.com',
   oauthClientId: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
   people: [
-    'John',
-    'Sarah',
-    'Mike',
-    // ... add your people
+    { name: 'John', color: '#4285f4' },
+    { name: 'Sarah', color: '#ea4335' },
+    { name: 'Mike', color: '#fbbc04' },
+    // ... add your people with colors
   ],
   projects: [
-    { name: 'Project Alpha', color: '#4285f4' },
-    { name: 'Project Beta', color: '#ea4335' },
+    'Project Alpha',
+    'Project Beta',
     // ... add your projects
+  ],
+  roles: [
+    'Project-Manager',
+    'Foreman',
+    'Shaper',
+    'Operator-Shaper'
+    // ... add your roles
   ]
 };
 ```
@@ -148,22 +159,54 @@ Then open: `http://localhost:8000`
 2. Click "Sign in with Google" (first time only, or if signed out)
 3. Authorize the app to access your Google Calendar
 4. The calendar will load events from your shared dummy calendar
-5. **Create assignment**: Click an empty date slot, enter person name and project
+5. **Create assignment**: Click an empty date slot, select person, project, and role
 6. **Move assignment**: Drag an event to a different date
 7. **Resize assignment**: Drag the edges of an event to change duration
 8. **Delete assignment**: Click an event and confirm deletion
 9. **Filter**: Use the dropdowns to filter by person or project
 10. **Change view**: Use the view selector or calendar toolbar buttons
-11. **Sign out**: Click "Sign out" button when done
+11. **Overview mode**: Click the "Overview" button to see a table-based view with:
+    - Projects grouped vertically (each project has its own section)
+    - Each project shows rows for each person-role combination with assignments
+    - Days as columns (grouped by month and week)
+    - Three sticky left columns: Project name, Role, and Person
+    - Sticky top header with year display and "Today" button
+    - Color-coded bars showing assignments spanning multiple days
+    - Day numbers displayed in cells, weekday names in column headers
+    - Empty rows between projects have no grid lines for visual separation
+12. **Sign out**: Click "Sign out" button when done
+
+## Overview Structure
+
+The Overview mode provides a comprehensive table view of all personnel assignments:
+
+- **Left Columns (Sticky)**: 
+  - **Project**: Project name displayed in the first row of each project group
+  - **Role**: Role assigned (e.g., Project-Manager, Foreman)
+  - **Person**: Person assigned to the role
+
+- **Top Headers (Sticky)**:
+  - **Year and Today Button**: Always visible at the top
+  - **Month Headers**: Group columns by month
+  - **Week Headers**: Show work week numbers
+  - **Day Headers**: Display weekday names (Mon, Tue, Wed, etc.)
+
+- **Data Cells**:
+  - Day numbers appear in each cell
+  - Color-coded bars span across days for multi-day assignments
+  - Bars show the project color for easy identification
 
 ## Event Format
 
 Events are stored in Google Calendar with the format:
 ```
-[Person Name] - [Project Name]
+[Person Name] - [Project Name] - [Role]
 ```
 
-Example: `John - Project Alpha`
+Examples:
+- `John - Project Alpha - Project-Manager`
+- `Sarah - Project Beta - Foreman`
+- `Mike - Project Alpha - Shaper`
 
 ## Security Notes
 
@@ -194,16 +237,42 @@ Example: `John - Project Alpha`
 ## Customization
 
 ### Adding People
-Edit `config.js` and add names to the `people` array.
-
-### Adding Projects
-Edit `config.js` and add projects to the `projects` array with a color:
+Edit `config.js` and add people to the `people` array with names and colors:
 ```javascript
-{ name: 'Project Name', color: '#hexcolor' }
+people: [
+  { name: 'John', color: '#4285f4' },
+  { name: 'Sarah', color: '#ea4335' },
+  // ... add more people
+]
 ```
 
-### Changing Colors
-Update the `color` property in the `projects` array. Use hex colors (e.g., `#4285f4`).
+### Adding Projects
+Edit `config.js` and add project names to the `projects` array:
+```javascript
+projects: [
+  'Project Alpha',
+  'Project Beta',
+  // ... add more projects
+]
+```
+
+### Adding Roles
+Edit `config.js` and add roles to the `roles` array:
+```javascript
+roles: [
+  'Project-Manager',
+  'Foreman',
+  'Shaper',
+  'Operator-Shaper',
+  // ... add more roles
+]
+```
+
+### Changing Person Colors
+Update the `color` property in the `people` array. Use hex colors (e.g., `#4285f4`).
+
+### Managing People and Projects
+Use the "Manage People" and "Manage Projects" buttons in the interface to add, edit, or remove entries without editing the config file directly.
 
 ## License
 
