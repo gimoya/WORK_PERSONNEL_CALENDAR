@@ -41,9 +41,9 @@
         </div>
         
         <div class="control-group">
-          <label for="personFilter">Filter by Person</label>
+          <label for="personFilter">Filter by Personnel</label>
           <select id="personFilter">
-            <option value="">All People</option>
+            <option value="">All Personnel</option>
           </select>
         </div>
         
@@ -63,11 +63,15 @@
         </div>
         
         <div class="control-group">
-          <button id="managePeopleBtn" class="btn btn-secondary">Manage People</button>
+          <button id="managePeopleBtn" class="btn btn-secondary">Manage Personnel</button>
         </div>
         
         <div class="control-group">
           <button id="manageProjectsBtn" class="btn btn-secondary">Manage Projects</button>
+        </div>
+        
+        <div class="control-group">
+          <button id="manageRolesBtn" class="btn btn-secondary">Manage Roles</button>
         </div>
         </div>
       </div>
@@ -88,9 +92,9 @@
       <h2>Create New Assignment</h2>
       <div class="modal-form">
         <div class="form-group">
-          <label for="eventPerson">Person:</label>
+          <label for="eventPerson">Personnel:</label>
           <select id="eventPerson" class="form-control">
-            <option value="">Select a person...</option>
+            <option value="">Select personnel...</option>
           </select>
         </div>
         <div class="form-group">
@@ -117,19 +121,15 @@
   <div id="peopleModal" class="modal" style="display: none;">
     <div class="modal-content">
       <span class="modal-close" data-modal="peopleModal">&times;</span>
-      <h2>Manage People</h2>
+      <h2>Manage Personnel</h2>
       <div class="modal-form">
         <div class="form-group">
-          <label for="newPersonName">Add New Person:</label>
-          <input type="text" id="newPersonName" class="form-control" placeholder="Enter person name">
+          <label for="newPersonName">Add New Personnel:</label>
+          <input type="text" id="newPersonName" class="form-control" placeholder="Enter personnel name">
         </div>
+        <button id="addPersonBtn" class="btn btn-primary">Add Personnel</button>
         <div class="form-group">
-          <label for="newPersonColor">Color:</label>
-          <input type="color" id="newPersonColor" class="form-control" value="#4285f4">
-        </div>
-        <button id="addPersonBtn" class="btn btn-primary">Add Person</button>
-        <div class="form-group">
-          <label>Current People:</label>
+          <label>Current Personnel:</label>
           <div id="peopleList" class="item-list"></div>
         </div>
         <div class="form-actions">
@@ -156,6 +156,32 @@
         </div>
         <div class="form-actions">
           <button id="projectsCloseBtn" class="btn btn-secondary">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal for managing roles -->
+  <div id="rolesModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <span class="modal-close" data-modal="rolesModal">&times;</span>
+      <h2>Manage Roles</h2>
+      <div class="modal-form">
+        <div class="form-group">
+          <label for="newRoleName">Role Name:</label>
+          <input type="text" id="newRoleName" class="form-control" placeholder="Enter role name">
+        </div>
+        <div class="form-group">
+          <label for="newRoleColor">Color:</label>
+          <input type="color" id="newRoleColor" class="form-control" value="#4285f4">
+        </div>
+        <button id="addRoleBtn" class="btn btn-primary">Add Role</button>
+        <div class="form-group" style="margin-top: 20px;">
+          <label>Current Roles:</label>
+          <div id="rolesList" class="item-list"></div>
+        </div>
+        <div class="form-actions">
+          <button id="rolesCloseBtn" class="btn btn-secondary">Close</button>
         </div>
       </div>
     </div>

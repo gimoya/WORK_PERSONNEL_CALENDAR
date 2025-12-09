@@ -482,29 +482,32 @@ body {
   position: sticky;
   z-index: 21;
   font-weight: 600;
-  font-size: 11px;
-  padding: 4px 8px;
+  font-size: 13px;
+  padding: 4px 4px;
   border: 1px solid #d0d0d0;
   border-right: 2px solid #d0d0d0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .overview-table .project-col-header {
   left: 0;
-  min-width: 150px;
-  width: 150px;
+  min-width: 100px;
+  width: 100px;
   border-left: 2px solid #d0d0d0;
 }
 
 .overview-table .role-col-header {
-  left: 150px;
+  left: 100px;
   min-width: 120px;
   width: 120px;
 }
 
 .overview-table .person-col-header {
-  left: 270px;
-  min-width: 120px;
-  width: 120px;
+  left: 220px;
+  min-width: 80px;
+  width: 80px;
   border-right: 2px solid #d0d0d0;
 }
 
@@ -527,6 +530,18 @@ body {
   font-size: 9px;
   padding: 4px 1px;
   background-color: #f8f9fa;
+}
+
+.overview-table .header-row-day th.day-header.conflict,
+.overview-table td.person-col.conflict {
+  background-color: #ffcccc;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 0, 0, 0.2) 4px,
+    rgba(255, 0, 0, 0.2) 8px
+  );
 }
 
 .overview-table .header-row-day th.day-header.weekend {
@@ -554,44 +569,57 @@ body {
 }
 
 .overview-table td.project-col {
-  min-width: 150px;
-  width: 150px;
+  min-width: 100px;
+  width: 100px;
+  max-width: 100px;
   text-align: left;
   vertical-align: middle;
-  padding: 3px 8px;
+  padding: 3px 4px;
   background-color: #e8eaed;
   position: sticky;
   left: 0;
   z-index: 10;
   border-right: 2px solid #d0d0d0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .overview-table td.role-col {
   min-width: 120px;
   width: 120px;
+  max-width: 120px;
   text-align: left;
-  padding: 3px 8px;
+  padding: 3px 4px;
   background-color: #f8f9fa;
   position: sticky;
-  left: 150px;
+  left: 100px;
   z-index: 10;
   border-right: 1px solid #e0e0e0;
   font-weight: 700;
   font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .overview-table td.person-col {
-  min-width: 120px;
-  width: 120px;
+  min-width: 80px;
+  width: 80px;
+  max-width: 80px;
   text-align: left;
-  padding: 3px 8px;
+  padding: 3px 4px;
   background-color: #f8f9fa;
   position: sticky;
-  left: 270px;
+  left: 220px;
   z-index: 10;
   border-right: 2px solid #d0d0d0;
   font-weight: 700;
   font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .project-name-rotated {

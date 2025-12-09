@@ -8,87 +8,200 @@ let isSignedIn = false;
 let allEvents = [];
 let currentSelectInfo = null; // Store selected date range for event creation
 
-// Load config from localStorage or use default
+// Get default config data (used when creating new config event or when not signed in)
+function getDefaultConfigData() {
+  return {
+    personnel: [],
+    projects: [],
+    roles: [
+      { name: 'Project-Manager', color: '#4285f4' },
+      { name: 'Foreman', color: '#ea4335' },
+      { name: 'Shaper', color: '#fbbc04' },
+      { name: 'Operator-Shaper', color: '#34a853' }
+    ]
+  };
+}
+
+// Initialize config arrays (data will be loaded from calendar)
 function loadConfig() {
-  // Store default roles before any modifications
-  // If CONFIG.roles is not defined yet, use defaults
-  const defaultRoles = (CONFIG.roles && CONFIG.roles.length > 0) 
-    ? [...CONFIG.roles] 
-    : ['Project-Manager', 'Foreman', 'Shaper', 'Operator-Shaper'];
+  // Initialize empty arrays - data comes from calendar event
+  CONFIG.personnel = [];
+  CONFIG.projects = [];
+  CONFIG.roles = [];
+}
+
+// Find or create config event in calendar
+async function findOrCreateConfigEvent() {
+  const CONFIG_EVENT_DATE = '2000-01-01';
+  const CONFIG_EVENT_TITLE = '__PERSONNEL_CONFIG__';
   
-  const savedConfig = localStorage.getItem('personnelCalendarConfig');
-  if (savedConfig) {
-    const parsed = JSON.parse(savedConfig);
-    // Merge with default CONFIG (preserve calendarId and oauthClientId)
+  try {
+    // Search for existing config event
+    const response = await gapiClient.calendar.events.list({
+      calendarId: CONFIG.calendarId,
+      timeMin: CONFIG_EVENT_DATE + 'T00:00:00Z',
+      timeMax: CONFIG_EVENT_DATE + 'T23:59:59Z',
+      singleEvents: true,
+      q: CONFIG_EVENT_TITLE
+    });
     
-    // Migrate projects from old format (objects with colors) to new format (strings)
-    if (parsed.projects) {
-      CONFIG.projects = parsed.projects.map(project => {
-        if (typeof project === 'string') {
-          return project;
-        }
-        // Old format: extract just the name
-        return project.name || project;
-      });
-    } else {
-      // Migrate default CONFIG.projects if they're objects
-      if (CONFIG.projects && CONFIG.projects.length > 0 && typeof CONFIG.projects[0] === 'object') {
-        CONFIG.projects = CONFIG.projects.map(project => project.name || project);
-      }
+    const events = response.result.items || [];
+    const configEvent = events.find(e => e.summary === CONFIG_EVENT_TITLE);
+    
+    if (configEvent) {
+      return configEvent;
     }
     
-    // Migrate people from old format (strings) to new format (objects with colors)
-    if (parsed.people) {
-      const defaultColors = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#9c27b0', '#ff9800', '#00bcd4', '#795548', '#607d8b', '#e91e63'];
-      CONFIG.people = parsed.people.map((person, index) => {
-        if (typeof person === 'string') {
-          // Old format: migrate to new format
-          return { name: person, color: defaultColors[index % defaultColors.length] };
+    // Create new config event with defaults
+    const defaultData = getDefaultConfigData();
+    const newEvent = {
+      summary: CONFIG_EVENT_TITLE,
+      start: { date: CONFIG_EVENT_DATE },
+      end: { date: '2000-01-02' },
+      extendedProperties: {
+        shared: {
+          personnelConfig: JSON.stringify(defaultData)
         }
-        // New format: ensure it has name and color
-        return { name: person.name || person, color: person.color || defaultColors[index % defaultColors.length] };
-      });
-    } else {
-      // Migrate default CONFIG.people if they're strings
-      if (CONFIG.people && CONFIG.people.length > 0 && typeof CONFIG.people[0] === 'string') {
-        const defaultColors = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#9c27b0', '#ff9800', '#00bcd4', '#795548', '#607d8b', '#e91e63'];
-        CONFIG.people = CONFIG.people.map((person, index) => ({
-          name: person,
-          color: defaultColors[index % defaultColors.length]
-        }));
       }
-    }
-  } else {
-    // Migrate default CONFIG.people if they're strings
-    if (CONFIG.people && CONFIG.people.length > 0 && typeof CONFIG.people[0] === 'string') {
-      const defaultColors = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#9c27b0', '#ff9800', '#00bcd4', '#795548', '#607d8b', '#e91e63'];
-      CONFIG.people = CONFIG.people.map((person, index) => ({
-        name: person,
-        color: defaultColors[index % defaultColors.length]
-      }));
-    }
-  }
-  
-  // Always preserve roles from default CONFIG (roles are system configuration, not user data)
-  CONFIG.roles = defaultRoles;
-  
-  // Final fallback: ensure roles are always set
-  if (!CONFIG.roles || CONFIG.roles.length === 0) {
-    CONFIG.roles = ['Project-Manager', 'Foreman', 'Shaper', 'Operator-Shaper'];
+    };
+    
+    const createResponse = await gapiClient.calendar.events.insert({
+      calendarId: CONFIG.calendarId,
+      resource: newEvent
+    });
+    
+    return createResponse.result;
+  } catch (error) {
+    console.error('Error finding/creating config event:', error);
+    throw error;
   }
 }
 
-// Save config to localStorage
-function saveConfig() {
-  const configToSave = {
-    people: CONFIG.people,
-    projects: CONFIG.projects
-  };
-  localStorage.setItem('personnelCalendarConfig', JSON.stringify(configToSave));
+// Load config from calendar
+async function loadConfigFromCalendar() {
+  if (!isSignedIn || !gapiClient) {
+    // If not signed in, use defaults
+    const defaultData = getDefaultConfigData();
+    CONFIG.personnel = defaultData.personnel;
+    CONFIG.projects = defaultData.projects;
+    CONFIG.roles = defaultData.roles;
+    return;
+  }
+  
+  try {
+    const configEvent = await findOrCreateConfigEvent();
+    
+    if (configEvent?.extendedProperties?.shared?.personnelConfig) {
+      const configData = JSON.parse(configEvent.extendedProperties.shared.personnelConfig);
+      
+      // Migrate roles from old format (strings) to new format (objects with colors)
+      if (configData.roles && Array.isArray(configData.roles)) {
+        const defaultColors = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#9c27b0', '#ff9800', '#00bcd4', '#795548', '#607d8b', '#e91e63'];
+        CONFIG.roles = configData.roles.map((role, index) => {
+          if (typeof role === 'string') {
+            return { name: role, color: defaultColors[index % defaultColors.length] };
+          }
+          return { name: role.name || role, color: role.color || defaultColors[index % defaultColors.length] };
+        });
+      } else {
+        // Use defaults if no roles
+        const defaultData = getDefaultConfigData();
+        CONFIG.roles = defaultData.roles;
+      }
+      
+      // Migrate personnel from old format (objects with colors) to new format (strings)
+      // Handle both old "people" and new "personnel" keys for backward compatibility
+      const personnelData = configData.personnel || configData.people;
+      if (personnelData && Array.isArray(personnelData)) {
+        CONFIG.personnel = personnelData.map(person => {
+          return typeof person === 'string' ? person : (person.name || person);
+        });
+      } else {
+        CONFIG.personnel = [];
+      }
+      
+      if (configData.projects && Array.isArray(configData.projects)) {
+        CONFIG.projects = configData.projects.map(project => {
+          return typeof project === 'string' ? project : (project.name || project);
+        });
+      } else {
+        CONFIG.projects = [];
+      }
+    } else {
+      // No config data, use defaults
+      const defaultData = getDefaultConfigData();
+      CONFIG.personnel = defaultData.personnel;
+      CONFIG.projects = defaultData.projects;
+      CONFIG.roles = defaultData.roles;
+    }
+  } catch (error) {
+    console.error('Error loading config from calendar:', error);
+    // Fall back to defaults
+    const defaultData = getDefaultConfigData();
+    CONFIG.personnel = defaultData.personnel;
+    CONFIG.projects = defaultData.projects;
+    CONFIG.roles = defaultData.roles;
+  }
+}
+
+// Save config to calendar
+async function saveConfigToCalendar() {
+  if (!isSignedIn || !gapiClient) {
+    return; // Can't save to calendar if not signed in
+  }
+  
+  try {
+    const configEvent = await findOrCreateConfigEvent();
+    
+    const configData = {
+      personnel: CONFIG.personnel,
+      projects: CONFIG.projects,
+      roles: CONFIG.roles
+    };
+    
+    await gapiClient.calendar.events.update({
+      calendarId: CONFIG.calendarId,
+      eventId: configEvent.id,
+      resource: {
+        ...configEvent,
+        extendedProperties: {
+          shared: {
+            personnelConfig: JSON.stringify(configData)
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error saving config to calendar:', error);
+    throw error;
+  }
+}
+
+// Save config to calendar
+async function saveConfig() {
+  // Only save to calendar - no localStorage
+  if (isSignedIn && gapiClient) {
+    try {
+      await saveConfigToCalendar();
+    } catch (error) {
+      console.error('Failed to save config to calendar:', error);
+      throw error;
+    }
+  } else {
+    console.warn('Cannot save config: not signed in');
+  }
 }
 
 // Initialize config on load
 loadConfig();
+
+// Load defaults if not signed in (will be overridden when signed in)
+if (!isSignedIn) {
+  const defaultData = getDefaultConfigData();
+  CONFIG.personnel = defaultData.personnel;
+  CONFIG.projects = defaultData.projects;
+  CONFIG.roles = defaultData.roles;
+}
 
 // Initialize the application
 async function init() {
@@ -207,6 +320,13 @@ async function onSignInSuccess() {
   
   showStatus('Signed in successfully', 'success');
   
+  // Load config from calendar (will override localStorage)
+  try {
+    await loadConfigFromCalendar();
+  } catch (error) {
+    console.error('Error loading config from calendar:', error);
+  }
+  
   // Initialize UI
   initializeUI();
   
@@ -305,7 +425,10 @@ async function loadEvents() {
       orderBy: 'startTime'
     });
     
-    allEvents = response.result.items || [];
+    // Filter out config event
+    allEvents = (response.result.items || []).filter(e => 
+      !e.summary || e.summary !== '__PERSONNEL_CONFIG__'
+    );
     
     // Update calendar display
     updateCalendar();
@@ -351,16 +474,45 @@ function parseEvent(event) {
   return { person: '', project: summary, role: '' };
 }
 
-// Get person color
-function getPersonColor(personName) {
-  const personConfig = CONFIG.people.find(p => p.name === personName);
-  return personConfig ? personConfig.color : '#9aa0a6';
+// Get role color
+function getRoleColor(roleName) {
+  const roleConfig = CONFIG.roles.find(r => (r.name || r) === roleName);
+  return roleConfig ? (roleConfig.color || '#9aa0a6') : '#9aa0a6';
+}
+
+// Check if person, project, or role exists in CONFIG
+function isValidEvent(person, project, role) {
+  // If person is empty, consider it valid (might be old format event)
+  // If person has a value, it must exist in CONFIG
+  const personExists = !person || person.trim() === '' || CONFIG.personnel.some(p => {
+    const personName = typeof p === 'string' ? p : p.name;
+    return personName === person;
+  });
+  
+  // If project is empty, consider it valid (might be old format event)
+  // If project has a value, it must exist in CONFIG
+  const projectExists = !project || project.trim() === '' || CONFIG.projects.some(p => {
+    const projectName = typeof p === 'string' ? p : p.name;
+    return projectName === project;
+  });
+  
+  // If role is empty, consider it valid (might be old format event)
+  // If role has a value, it must exist in CONFIG
+  const roleExists = !role || role.trim() === '' || CONFIG.roles.some(r => {
+    const roleName = typeof r === 'string' ? r : r.name;
+    return roleName === role;
+  });
+  
+  return personExists && projectExists && roleExists;
 }
 
 // Convert Google Calendar event to FullCalendar event
 function toFullCalendarEvent(gcalEvent) {
   const { person, project, role } = parseEvent(gcalEvent);
-  const color = getPersonColor(person);
+  
+  // Check if event references removed items - if so, use grey color
+  const isValid = isValidEvent(person, project, role);
+  const color = isValid ? getRoleColor(role) : '#9aa0a6';
   
   const start = gcalEvent.start.dateTime || gcalEvent.start.date;
   const end = gcalEvent.end.dateTime || gcalEvent.end.date;
@@ -395,10 +547,11 @@ function initializeUI() {
   
   // Populate person filter
   const personFilter = document.getElementById('personFilter');
-  CONFIG.people.forEach(person => {
+  CONFIG.personnel.forEach(person => {
     const option = document.createElement('option');
-    option.value = person.name || person;
-    option.textContent = person.name || person;
+    const personName = typeof person === 'string' ? person : person.name;
+    option.value = personName;
+    option.textContent = personName;
     personFilter.appendChild(option);
   });
   
@@ -406,7 +559,7 @@ function initializeUI() {
   const projectFilter = document.getElementById('projectFilter');
   CONFIG.projects.forEach(project => {
     const option = document.createElement('option');
-    const projectName = project.name || project;
+    const projectName = typeof project === 'string' ? project : project.name;
     option.value = projectName;
     option.textContent = projectName;
     projectFilter.appendChild(option);
@@ -424,11 +577,7 @@ function initializeUI() {
     selectable: true,
     selectMirror: true,
     dayMaxEvents: true,
-    headerToolbar: {
-      left: 'prev,next today',
-      center: 'title',
-      right: 'dayGridMonth,timeGridWeek,listYear'
-    },
+    headerToolbar: false, // No navigation buttons - month view only
     events: [],
     select: handleDateSelect,
     eventDrop: handleEventDrop,
@@ -450,7 +599,7 @@ function initializeUI() {
     const btn = document.getElementById('overviewToggleBtn');
     if (overviewActive) {
       showCompactYearView();
-      btn.textContent = 'Hide Overview';
+      btn.textContent = 'Scheduling';
       btn.classList.add('btn-primary');
       btn.classList.remove('btn-secondary');
     } else {
@@ -473,6 +622,12 @@ function initializeUI() {
   document.getElementById('manageProjectsBtn').addEventListener('click', () => {
     showProjectsModal();
   });
+  const manageRolesBtn = document.getElementById('manageRolesBtn');
+  if (manageRolesBtn) {
+    manageRolesBtn.addEventListener('click', () => {
+      showRolesModal();
+    });
+  }
   
   // People management
   document.getElementById('addPersonBtn').addEventListener('click', addPerson);
@@ -492,11 +647,30 @@ function initializeUI() {
     document.getElementById('projectsModal').style.display = 'none';
   });
   
+  // Roles management
+  const addRoleBtn = document.getElementById('addRoleBtn');
+  const rolesCloseBtn = document.getElementById('rolesCloseBtn');
+  const rolesModalClose = document.querySelector('#rolesModal .modal-close');
+  if (addRoleBtn) {
+    addRoleBtn.addEventListener('click', addRole);
+  }
+  if (rolesCloseBtn) {
+    rolesCloseBtn.addEventListener('click', () => {
+      document.getElementById('rolesModal').style.display = 'none';
+    });
+  }
+  if (rolesModalClose) {
+    rolesModalClose.addEventListener('click', () => {
+      document.getElementById('rolesModal').style.display = 'none';
+    });
+  }
+  
   // Close modals when clicking outside
   window.addEventListener('click', (e) => {
     const eventModal = document.getElementById('eventModal');
     const peopleModal = document.getElementById('peopleModal');
     const projectsModal = document.getElementById('projectsModal');
+    const rolesModal = document.getElementById('rolesModal');
     
     if (e.target === eventModal) {
       closeEventModal();
@@ -506,6 +680,9 @@ function initializeUI() {
     }
     if (e.target === projectsModal) {
       projectsModal.style.display = 'none';
+    }
+    if (rolesModal && e.target === rolesModal) {
+      rolesModal.style.display = 'none';
     }
   });
 }
@@ -530,7 +707,7 @@ function updateCalendar() {
   
   // Also update compact year view if it's active
   const overviewBtn = document.getElementById('overviewToggleBtn');
-  if (overviewBtn && overviewBtn.textContent === 'Hide Overview') {
+  if (overviewBtn && overviewBtn.textContent === 'Scheduling') {
     renderCompactYearView();
   }
 }
@@ -550,16 +727,17 @@ function handleDateSelect(selectInfo) {
   }
   
   // Clear existing options (except first)
-  personSelect.innerHTML = '<option value="">Select a person...</option>';
+  personSelect.innerHTML = '<option value="">Select personnel...</option>';
   projectSelect.innerHTML = '<option value="">Select a project...</option>';
   roleSelect.innerHTML = '<option value="">Select a role...</option>';
   
   // Populate person dropdown
-  if (CONFIG.people && CONFIG.people.length > 0) {
-    CONFIG.people.forEach(person => {
+  if (CONFIG.personnel && CONFIG.personnel.length > 0) {
+    CONFIG.personnel.forEach(person => {
       const option = document.createElement('option');
-      option.value = person.name || person;
-      option.textContent = person.name || person;
+      const personName = typeof person === 'string' ? person : person.name;
+      option.value = personName;
+      option.textContent = personName;
       personSelect.appendChild(option);
     });
   }
@@ -568,7 +746,7 @@ function handleDateSelect(selectInfo) {
   if (CONFIG.projects && CONFIG.projects.length > 0) {
     CONFIG.projects.forEach(project => {
       const option = document.createElement('option');
-      const projectName = project.name || project;
+      const projectName = typeof project === 'string' ? project : project.name;
       option.value = projectName;
       option.textContent = projectName;
       projectSelect.appendChild(option);
@@ -576,27 +754,20 @@ function handleDateSelect(selectInfo) {
   }
   
   // Populate role dropdown
-  // Always use hardcoded roles to ensure they're available
-  const rolesToAdd = ['Project-Manager', 'Foreman', 'Shaper', 'Operator-Shaper'];
-  
-  // Also check CONFIG.roles if available
   if (CONFIG.roles && CONFIG.roles.length > 0) {
-    rolesToAdd.length = 0; // Clear array
-    CONFIG.roles.forEach(r => rolesToAdd.push(r));
-  }
-  
-  if (roleSelect) {
-    // Clear existing options first (keep the first "Select..." option)
-    roleSelect.innerHTML = '<option value="">Select a role...</option>';
-    
-    rolesToAdd.forEach(role => {
-      if (role && role.trim()) { // Only add non-empty roles
-        const option = document.createElement('option');
-        option.value = role;
-        option.textContent = role;
-        roleSelect.appendChild(option);
-      }
-    });
+    if (roleSelect) {
+      roleSelect.innerHTML = '<option value="">Select a role...</option>';
+      
+      CONFIG.roles.forEach(role => {
+        const roleName = typeof role === 'string' ? role : role.name;
+        if (roleName && roleName.trim()) {
+          const option = document.createElement('option');
+          option.value = roleName;
+          option.textContent = roleName;
+          roleSelect.appendChild(option);
+        }
+      });
+    }
   }
   
   // Show modal
@@ -642,7 +813,7 @@ async function handleEventCreate() {
   const role = document.getElementById('eventRole').value;
   
   if (!person || !project || !role) {
-    showStatus('Please select person, project, and role', 'error');
+    showStatus('Please select personnel, project, and role', 'error');
     return;
   }
   
@@ -866,62 +1037,46 @@ function updatePeopleList() {
   const peopleList = document.getElementById('peopleList');
   peopleList.innerHTML = '';
   
-  if (CONFIG.people.length === 0) {
-    peopleList.innerHTML = '<p style="color: #999; padding: 10px;">No people added yet.</p>';
+  if (CONFIG.personnel.length === 0) {
+    peopleList.innerHTML = '<p style="color: #999; padding: 10px;">No personnel added yet.</p>';
     return;
   }
   
-  CONFIG.people.forEach((person, index) => {
-    const personName = person.name || person;
-    const personColor = person.color || '#9aa0a6';
+  CONFIG.personnel.forEach((person, index) => {
+    const personName = typeof person === 'string' ? person : person.name;
     const item = document.createElement('div');
     item.className = 'item-list-item';
     item.innerHTML = `
-      <input type="color" class="person-color-picker" value="${personColor}" data-index="${index}" style="width: 30px; height: 30px; border: none; cursor: pointer; border-radius: 4px;">
       <span class="item-name">${personName}</span>
       <div class="item-actions">
         <button class="btn btn-small btn-secondary" onclick="removePerson(${index})">Remove</button>
       </div>
     `;
     peopleList.appendChild(item);
-    
-    // Add color change handler
-    const colorPicker = item.querySelector('.person-color-picker');
-    colorPicker.addEventListener('change', (e) => {
-      CONFIG.people[index].color = e.target.value;
-      saveConfig();
-      updateCalendar();
-      if (document.getElementById('overviewToggleBtn')?.textContent === 'Hide Overview') {
-        renderCompactYearView();
-      }
-    });
   });
 }
 
 // Add person
 function addPerson() {
   const nameInput = document.getElementById('newPersonName');
-  const colorInput = document.getElementById('newPersonColor');
   const name = nameInput.value.trim();
-  const color = colorInput.value;
   
   if (!name) {
-    showStatus('Please enter a person name', 'error');
+    showStatus('Please enter a personnel name', 'error');
     return;
   }
   
-  // Check if person already exists (handle both old string format and new object format)
-  const exists = CONFIG.people.some(p => (p.name || p) === name);
+  // Check if person already exists
+  const exists = CONFIG.personnel.some(p => (typeof p === 'string' ? p : p.name) === name);
   if (exists) {
-    showStatus('Person already exists', 'error');
+    showStatus('Personnel already exists', 'error');
     return;
   }
   
-  CONFIG.people.push({ name: name, color: color });
+  CONFIG.personnel.push(name);
   saveConfig();
   updatePeopleList();
   updateFilters();
-  updatePersonnelLegend();
   
   // Re-render compact year view if it's currently visible
   const compactYearView = document.getElementById('compactYearView');
@@ -930,21 +1085,19 @@ function addPerson() {
   }
   
   nameInput.value = '';
-  colorInput.value = '#4285f4';
-  showStatus('Person added successfully', 'success');
+  showStatus('Personnel added successfully', 'success');
   setTimeout(() => hideStatus(), 2000);
 }
 
 // Remove person
 function removePerson(index) {
-  const person = CONFIG.people[index];
-  const personName = person.name || person;
+  const person = CONFIG.personnel[index];
+  const personName = typeof person === 'string' ? person : person.name;
   if (confirm(`Remove "${personName}"?`)) {
-    CONFIG.people.splice(index, 1);
+    CONFIG.personnel.splice(index, 1);
     saveConfig();
     updatePeopleList();
     updateFilters();
-    updatePersonnelLegend();
     
     // Re-render compact year view if it's currently visible
     const compactYearView = document.getElementById('compactYearView');
@@ -952,7 +1105,7 @@ function removePerson(index) {
       renderCompactYearView();
     }
     
-    showStatus('Person removed', 'success');
+    showStatus('Personnel removed', 'success');
     setTimeout(() => hideStatus(), 2000);
   }
 }
@@ -974,7 +1127,7 @@ function updateProjectsList() {
   }
   
   CONFIG.projects.forEach((project, index) => {
-    const projectName = project.name || project;
+    const projectName = typeof project === 'string' ? project : project.name;
     const item = document.createElement('div');
     item.className = 'item-list-item';
     item.innerHTML = `
@@ -997,8 +1150,8 @@ function addProject() {
     return;
   }
   
-  // Check if project already exists (handle both old object format and new string format)
-  const exists = CONFIG.projects.some(p => (p.name || p) === name);
+  // Check if project already exists
+  const exists = CONFIG.projects.some(p => (typeof p === 'string' ? p : p.name) === name);
   if (exists) {
     showStatus('Project already exists', 'error');
     return;
@@ -1016,7 +1169,7 @@ function addProject() {
 // Remove project
 function removeProject(index) {
   const project = CONFIG.projects[index];
-  const projectName = project.name || project;
+  const projectName = typeof project === 'string' ? project : project.name;
   if (confirm(`Remove "${projectName}"?`)) {
     CONFIG.projects.splice(index, 1);
     saveConfig();
@@ -1032,12 +1185,12 @@ function updatePersonnelLegend() {
   const legendContainer = document.getElementById('personnelLegend');
   if (!legendContainer) return;
   
-  const legendItems = CONFIG.people.map(person => {
-    const personName = person.name || person;
-    const personColor = person.color || '#9aa0a6';
+  const legendItems = CONFIG.roles.map(role => {
+    const roleName = typeof role === 'string' ? role : role.name;
+    const roleColor = typeof role === 'string' ? '#9aa0a6' : (role.color || '#9aa0a6');
     return `<div class="personnel-legend-item">
-      <div class="personnel-legend-color" style="background-color: ${personColor};"></div>
-      <span class="personnel-legend-name">${personName}</span>
+      <div class="personnel-legend-color" style="background-color: ${roleColor};"></div>
+      <span class="personnel-legend-name">${roleName}</span>
     </div>`;
   }).join('');
   
@@ -1048,9 +1201,9 @@ function updateFilters() {
   // Update person filter
   const personFilter = document.getElementById('personFilter');
   const currentPersonValue = personFilter.value;
-  personFilter.innerHTML = '<option value="">All People</option>';
-  CONFIG.people.forEach(person => {
-    const personName = person.name || person;
+  personFilter.innerHTML = '<option value="">All Personnel</option>';
+  CONFIG.personnel.forEach(person => {
+    const personName = typeof person === 'string' ? person : person.name;
     const option = document.createElement('option');
     option.value = personName;
     option.textContent = personName;
@@ -1066,7 +1219,7 @@ function updateFilters() {
   projectFilter.innerHTML = '<option value="">All Projects</option>';
   CONFIG.projects.forEach(project => {
     const option = document.createElement('option');
-    const projectName = project.name || project;
+    const projectName = typeof project === 'string' ? project : project.name;
     option.value = projectName;
     option.textContent = projectName;
     if (projectName === currentProjectValue) {
@@ -1079,15 +1232,121 @@ function updateFilters() {
   updateCalendar();
 }
 
+// Show roles management modal
+function showRolesModal() {
+  updateRolesList();
+  document.getElementById('rolesModal').style.display = 'block';
+}
+
+// Update roles list display
+function updateRolesList() {
+  const rolesList = document.getElementById('rolesList');
+  rolesList.innerHTML = '';
+  
+  if (CONFIG.roles.length === 0) {
+    rolesList.innerHTML = '<p style="color: #999; padding: 10px;">No roles added yet.</p>';
+    return;
+  }
+  
+  CONFIG.roles.forEach((role, index) => {
+    const roleName = typeof role === 'string' ? role : role.name;
+    const roleColor = typeof role === 'string' ? '#9aa0a6' : (role.color || '#9aa0a6');
+    const item = document.createElement('div');
+    item.className = 'item-list-item';
+    item.innerHTML = `
+      <input type="color" class="role-color-picker" value="${roleColor}" data-index="${index}" style="width: 30px; height: 30px; border: none; cursor: pointer; border-radius: 4px;">
+      <span class="item-name">${roleName}</span>
+      <div class="item-actions">
+        <button class="btn btn-small btn-secondary" onclick="removeRole(${index})">Remove</button>
+      </div>
+    `;
+    rolesList.appendChild(item);
+    
+    // Add color change handler
+    const colorPicker = item.querySelector('.role-color-picker');
+    colorPicker.addEventListener('change', (e) => {
+      if (typeof CONFIG.roles[index] === 'string') {
+        CONFIG.roles[index] = { name: CONFIG.roles[index], color: e.target.value };
+      } else {
+        CONFIG.roles[index].color = e.target.value;
+      }
+      saveConfig();
+      updateCalendar();
+      updatePersonnelLegend();
+      if (document.getElementById('overviewToggleBtn')?.textContent === 'Scheduling') {
+        renderCompactYearView();
+      }
+    });
+  });
+}
+
+// Add role
+function addRole() {
+  const nameInput = document.getElementById('newRoleName');
+  const colorInput = document.getElementById('newRoleColor');
+  const name = nameInput.value.trim();
+  const color = colorInput.value;
+  
+  if (!name) {
+    showStatus('Please enter a role name', 'error');
+    return;
+  }
+  
+  // Check if role already exists
+  const exists = CONFIG.roles.some(r => (typeof r === 'string' ? r : r.name) === name);
+  if (exists) {
+    showStatus('Role already exists', 'error');
+    return;
+  }
+  
+  CONFIG.roles.push({ name: name, color: color });
+  saveConfig();
+  updateRolesList();
+  updatePersonnelLegend();
+  
+  // Re-render compact year view if it's currently visible
+  const compactYearView = document.getElementById('compactYearView');
+  if (compactYearView && compactYearView.style.display !== 'none') {
+    renderCompactYearView();
+  }
+  
+  nameInput.value = '';
+  colorInput.value = '#4285f4';
+  showStatus('Role added successfully', 'success');
+  setTimeout(() => hideStatus(), 2000);
+}
+
+// Remove role
+function removeRole(index) {
+  const role = CONFIG.roles[index];
+  const roleName = typeof role === 'string' ? role : role.name;
+  if (confirm(`Remove "${roleName}"?`)) {
+    CONFIG.roles.splice(index, 1);
+    saveConfig();
+    updateRolesList();
+    updatePersonnelLegend();
+    
+    // Re-render compact year view if it's currently visible
+    const compactYearView = document.getElementById('compactYearView');
+    if (compactYearView && compactYearView.style.display !== 'none') {
+      renderCompactYearView();
+    }
+    
+    showStatus('Role removed', 'success');
+    setTimeout(() => hideStatus(), 2000);
+  }
+}
+
 // Make remove functions globally accessible
 window.removePerson = removePerson;
 window.removeProject = removeProject;
+window.removeRole = removeRole;
 
 // Refresh overview if it's currently visible
 function refreshOverviewIfVisible() {
   const compactYearView = document.getElementById('compactYearView');
   const overviewBtn = document.getElementById('overviewToggleBtn');
-  if (compactYearView && overviewBtn && overviewBtn.textContent === 'Hide Overview') {
+  if (compactYearView && overviewBtn && overviewBtn.textContent === 'Scheduling') {
     renderCompactYearView();
   }
 }
@@ -1184,6 +1443,9 @@ function renderCompactYearView() {
   
   // Create a map of all dates for each person+role in each project
   const personRoleDatesByProject = {};
+  // Build a map to detect conflicts: dateKey -> Map of personnel -> count
+  const personnelCountByDate = {};
+  
   Object.keys(eventsByProjectPersonRole).forEach(project => {
     personRoleDatesByProject[project] = {};
     Object.keys(eventsByProjectPersonRole[project]).forEach(personRoleKey => {
@@ -1196,8 +1458,19 @@ function renderCompactYearView() {
         const current = new Date(start);
         
         while (current <= end) {
-          const dateKey = current.toISOString().split('T')[0];
+          // Use local date formatting to avoid timezone issues
+          const dateKey = formatLocalDate(current);
           dateSet.add(dateKey);
+          
+          // Track personnel assignments per date for conflict detection
+          if (!personnelCountByDate[dateKey]) {
+            personnelCountByDate[dateKey] = {};
+          }
+          if (!personnelCountByDate[dateKey][person]) {
+            personnelCountByDate[dateKey][person] = 0;
+          }
+          personnelCountByDate[dateKey][person]++;
+          
           current.setDate(current.getDate() + 1);
         }
       });
@@ -1207,6 +1480,18 @@ function renderCompactYearView() {
         role,
         dates: Array.from(dateSet).sort()
       };
+    });
+  });
+  
+  // Find dates with conflicts (same personnel assigned more than once)
+  const conflictedDates = new Set();
+  Object.keys(personnelCountByDate).forEach(dateKey => {
+    const personnelCounts = personnelCountByDate[dateKey];
+    // Check if any personnel appears more than once on this date
+    Object.keys(personnelCounts).forEach(person => {
+      if (personnelCounts[person] > 1) {
+        conflictedDates.add(dateKey);
+      }
     });
   });
   
@@ -1245,7 +1530,8 @@ function renderCompactYearView() {
       const daysInMonth = lastDay.getDate();
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
-        const dateKey = date.toISOString().split('T')[0];
+        // Use local date formatting to avoid timezone issues
+        const dateKey = formatLocalDate(date);
         const dayOfWeek = date.getDay();
         const dayName = dayNames[dayOfWeek === 0 ? 6 : dayOfWeek - 1];
         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -1279,7 +1565,7 @@ function renderCompactYearView() {
         <tr class="header-row-month">
           <th class="project-col-header" rowspan="3">Project</th>
           <th class="role-col-header" rowspan="3">Role</th>
-          <th class="person-col-header" rowspan="3">Person</th>`;
+          <th class="person-col-header" rowspan="3">Personnel</th>`;
   
   // Month header row - group days by month
   let currentMonth = null;
@@ -1330,7 +1616,9 @@ function renderCompactYearView() {
   // Row 3: Day name headers (weekday only)
   html += `<tr class="header-row-day">`;
   allDays.forEach(dayInfo => {
-    html += `<th class="day-header ${dayInfo.isWeekend ? 'weekend' : ''}" title="${dayInfo.dateKey}">
+    const hasConflict = conflictedDates.has(dayInfo.dateKey);
+    const conflictClass = hasConflict ? 'conflict' : '';
+    html += `<th class="day-header ${dayInfo.isWeekend ? 'weekend' : ''} ${conflictClass}" title="${dayInfo.dateKey}">
       ${dayInfo.dayName}
     </th>`;
   });
@@ -1354,9 +1642,9 @@ function renderCompactYearView() {
       return combo && combo.person && combo.role && combo.dates && combo.dates.length > 0;
     });
     
-    // Sort by CONFIG.roles order first, then by CONFIG.people order
-    const rolesOrder = CONFIG.roles || ['Project-Manager', 'Foreman', 'Shaper', 'Operator-Shaper'];
-    const peopleOrder = CONFIG.people.map(p => typeof p === 'string' ? p : p.name);
+    // Sort by CONFIG.roles order first, then by CONFIG.personnel order
+    const rolesOrder = CONFIG.roles.map(r => typeof r === 'string' ? r : r.name) || ['Project-Manager', 'Foreman', 'Shaper', 'Operator-Shaper'];
+    const peopleOrder = CONFIG.personnel.map(p => typeof p === 'string' ? p : p.name);
     
     personRoleKeys.sort((a, b) => {
       const comboA = personRoleCombos[a];
@@ -1398,10 +1686,18 @@ function renderCompactYearView() {
         return;
       }
       
-      const personColor = getPersonColor(person);
+      const roleColor = getRoleColor(role);
       const dateSet = new Set(dates);
       const isFirstRow = index === 0;
       const rowSpan = personRoleKeys.length;
+      
+      // Check if this person has conflicts on any of their assigned dates
+      const hasPersonConflict = dates.some(dateKey => {
+        return conflictedDates.has(dateKey) && 
+               personnelCountByDate[dateKey] && 
+               personnelCountByDate[dateKey][person] > 1;
+      });
+      const personColClass = hasPersonConflict ? 'person-col conflict' : 'person-col';
       
       html += `<tr class="data-row">`;
       
@@ -1412,16 +1708,19 @@ function renderCompactYearView() {
         </td>`;
       }
       
-      // Role column
-      html += `<td class="role-col">${role}</td>`;
+      // Role column (with role color background)
+      html += `<td class="role-col" style="background-color: ${roleColor};">${role}</td>`;
       
-      // Person column
-      html += `<td class="person-col" style="color: ${personColor};">${person}</td>`;
+      // Person column (diagonal stripe pattern if this person has conflicts)
+      html += `<td class="${personColClass}">${person}</td>`;
       
       // Day cells
       allDays.forEach((dayInfo, dayIndex) => {
         const hasPerson = dateSet.has(dayInfo.dateKey);
-        const isToday = dayInfo.dateKey === new Date().toISOString().split('T')[0];
+        // Use local date to avoid timezone issues
+        const today = new Date();
+        const todayKey = formatLocalDate(today);
+        const isToday = dayInfo.dateKey === todayKey;
         
         // Check if this is start, middle, or end of a bar span
         const prevDay = dayIndex > 0 ? allDays[dayIndex - 1] : null;
@@ -1450,7 +1749,7 @@ function renderCompactYearView() {
         html += `<div class="day-number-in-cell">${dayInfo.day}</div>`;
         
         if (hasPerson) {
-          html += `<div class="person-role-bar" style="background-color: ${personColor};"></div>`;
+          html += `<div class="person-role-bar" style="background-color: ${roleColor};"></div>`;
         }
         
         html += `</td>`;
